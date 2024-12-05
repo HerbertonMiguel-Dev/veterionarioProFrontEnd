@@ -18,12 +18,20 @@ import Router from 'next/router';
 import { canSSRAuth } from '../../../utils/canSSRAuth'
 import { configurarClienteAPI } from '../../../services/api'
 
+interface UsuarioProps {
+  id: string;
+
+}
+
 interface NewServicoProps {
+  usuario: UsuarioProps;
   assinatura: boolean;
+  premium: boolean;
+  basic: boolean;
   count: number;
 }
 
-export default function NewServico({ assinatura, count }: NewServicoProps) {
+export default function NewServico({ usuario, assinatura, count, basic, premium }: NewServicoProps) {
   const [isMobile] = useMediaQuery("(max-width: 500px)");
 
   const [nome, setNome] = useState('')
@@ -137,16 +145,29 @@ export default function NewServico({ assinatura, count }: NewServicoProps) {
               mb={6}
               bg="button.cta"
               _hover={{ bg: "#63f88d" }}
-              disabled={!assinatura && count >= 3}
+              disabled={(!assinatura && count >= 2) || (basic && count >= 5)}
               onClick={processarCadastro}
             >
               Cadastrar
             </Button>
 
-            {!assinatura && count >= 3 && (
-              <Flex direction="row" align="center" justifyContent="center">
+            {!assinatura && count >= 2 && (
+              <Flex direction="row" align="center" justifyContent="center" mt={2}>
                 <Text>
-                  Você atingiou seu limite de corte.
+                  Você atingiu o seu limite de 2 serviços do plano Gratis.
+                </Text>
+                <Link href="/planos">
+                  <Text fontWeight="bold" color="#ffffff" cursor="pointer" ml={1}>
+                   Seja Basic ou premium 
+                  </Text>
+                </Link>
+              </Flex>
+            )}
+
+            {assinatura && basic && count >= 3 && (
+              <Flex direction="row" align="center" justifyContent="center" mt={2}>
+                <Text>
+                  Você atingiu o limite de 3 serviços do plano básico.
                 </Text>
                 <Link href="/planos">
                   <Text fontWeight="bold" color="#ffffff" cursor="pointer" ml={1}>
@@ -172,13 +193,38 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
 
     const response = await apiClient.get('/servico/check')
     const count = await apiClient.get('/servico/count')
+    const assinatura = response.data?.assinaturas;
+
+    const resposta = await apiClient.get('/me')
+
+    const usuario = {
+      id: resposta.data.id,
+    }
+
+    // Definindo planos
+    let premium = false;
+    let basic = false;
+
+    // Lógica para verificar os planos
+    if (assinatura?.status === 'active') {
+      if (assinatura?.precoId === 'price_1QLXqSCvip3ZmFCDzUwEJkMA') {
+        premium = true;
+      } else if (assinatura?.precoId === 'price_1QS3QUCvip3ZmFCDJhr1m4RF') {
+        basic = true;
+      }
+    }
 
     return {
       props: {
         assinatura: response.data?.assinaturas?.status === 'active' ? true : false,
-        count: count.data
+        count: count.data,
+        usuario,
+        premium,
+        basic,
       }
     }
+
+
 
   } catch (err) {
     console.log(err);
